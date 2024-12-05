@@ -1,100 +1,57 @@
 import 'package:ammar_responsi/model/amiibo_model.dart';
-import 'package:ammar_responsi/presenters/amiibo_presenter.dart';
+import 'package:ammar_responsi/screens/detail.dart';
+import 'package:ammar_responsi/services/base_network.dart';
+import 'package:ammar_responsi/widgets/amiibo_card.dart';
 import 'package:flutter/material.dart';
 
-class Home extends StatefulWidget {
-  const Home({super.key});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
 
   @override
-  State<Home> createState() => _HomeState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeState extends State<Home> implements AmiiboView {
-  late AmiiboPresenter _presenter;
-  bool _isLoading = false;
-  List<amiibo> _amiiboList = [];
-  String? _errorMessage;
-  String _currentEndpoint = 'api/amiibo/';
+class _HomeScreenState extends State<HomeScreen> {
+  final ApiService apiService = ApiService();
+  late Future<List<Amiibo>> futureAmiibo;
 
   @override
   void initState() {
     super.initState();
-    _presenter = AmiiboPresenter(this);
-    _presenter.loadAmiiboData(_currentEndpoint);
-  }
-
-  void _fetchData(String endpoint) {
-    setState(() {
-      _currentEndpoint = endpoint;
-      _presenter.loadAmiiboData(endpoint);
-    });
-  }
-
-  @override
-  void showLoading() {
-    setState(() {
-      _isLoading = true;
-    });
-  }
-
-  @override
-  void hideLoading() {
-    setState(() {
-      _isLoading = false;
-    });
-  }
-
-  @override
-  void showAmiiboList(List<amiibo> amiiboList) {
-    setState(() {
-      _amiiboList = amiiboList;
-    });
-  }
-
-  @override
-  void showError(String message) {
-    setState(() {
-      _errorMessage = message;
-    });
+    futureAmiibo = apiService.fetchAmiibos();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Amiibo List"),
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: _isLoading
-                ? Center(child: CircularProgressIndicator())
-                : _errorMessage != null
-                    ? Center(child: Text("Error : ${_errorMessage}"))
-                    : ListView.builder(
-                        itemCount: _amiiboList.length,
-                        itemBuilder: (context, index) {
-                          final amiibo = _amiiboList[index];
-                          return ListTile(
-                            leading: amiibo.image.isNotEmpty
-                                ? Image.network(amiibo.image)
-                                : Image.network('https://placehold.co/600x400'),
-                            title: Text(amiibo.name),
-                            subtitle: Text('Game Series${amiibo.gameSeries}'),
-                            onTap: () {
-                              // Navigator.push(
-                              //   context,
-                              //   MaterialPageRoute(
-                              //     builder: (context) => DetailScreen(
-                              //         id: anime.id, endpoint: _currentEndpoint),
-                              //   ),
-                              // );
-                            },
-                          );
-                        },
+      appBar: AppBar(title: const Text('Amiibo List')),
+      body: FutureBuilder<List<Amiibo>>(
+        future: futureAmiibo,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          } else {
+            final amiibos = snapshot.data!;
+            return ListView.builder(
+              itemCount: amiibos.length,
+              itemBuilder: (context, index) {
+                return AmiiboCard(
+                  amiibo: amiibos[index],
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => DetailScreen(amiibo: amiibos[index]),
                       ),
-          )
-        ],
+                    );
+                  },
+                );
+              },
+            );
+          }
+        },
       ),
     );
   }
